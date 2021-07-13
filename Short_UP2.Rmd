@@ -1,0 +1,1471 @@
+---
+title: "Uttar Pradesh Assembly Analysis"
+resource_files:
+- AC_POST.dbf
+- AC_POST.prj
+- AC_POST.sbn
+- AC_POST.sbx
+- AC_POST.shx
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    theme: lumen
+    vertical_layout: scroll
+---
+  
+```{r setup, include=FALSE}
+# load data in 'global' chunk so it can be shared by all users of the dashboard
+library(datasets)
+data(faithful)
+library(dygraphs)
+library(shiny)
+library(flexdashboard)
+library(graphics)
+library(shinydashboard)
+
+# load data in 'global' chunk so it can be shared by all users of the dashboard
+library(ggplot2)
+library(fmsb)
+library(nlme)
+library(mgcv)
+library(readxl)
+library(rpivotTable)
+library(DT)
+library(methods)
+library(readr)
+library(sodium)
+library(shinyjs)
+library(shiny)
+library(ggplot2)
+library(sp)
+library(rgeos)
+library(readr)
+#library(Cairo) 
+library(scales)
+library(RColorBrewer)
+library(httr)
+library(maptools)
+library(readxl)
+library(rgdal)
+library(sf)
+#library(ggiraph)
+library(readxl)
+library(leaflet)
+library(htmltools)
+library(plyr)
+library(cowplot)
+library(sp)
+library(RColorBrewer)
+#library(mapview)
+library(DT)
+library(shinyjs)
+library(sodium)
+
+
+
+
+UP_dB_v2 <- read_csv("UP_dB_v2.csv", col_types = cols(AC_Num = col_number(), 
+                                                      Gen_OBC = col_number(), Hindu = col_number(), 
+                                                      Islam = col_number(), Largest_Caste = col_number(), 
+                                                      Other_Rel = col_number(), PC_Num = col_number(), 
+                                                      Rural = col_number(), SC = col_number(), 
+                                                      ST = col_number(), Total_Electors = col_number(), 
+                                                      Urban = col_number()))
+
+#UP_dB <- read_excel("Copy of UP Master Sheet_GILP.xlsx", col_types = c("text", "text", "numeric", "text", "numeric", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "text", "numeric", "text", "numeric", "text", "numeric", "text", "numeric", "text", "numeric", "numeric", "text", "text", "numeric", "text", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "text", "text", "numeric", "text", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "text", "text", "numeric", "text", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "text", "text", "numeric", "text", "text", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",  "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",  "numeric", "numeric"))
+
+#UP_dB<- UP_dB[c(1:403),]
+
+UP_dB<- UP_dB_v2
+
+District<- unique(UP_dB$District)
+District<- as.data.frame(District)
+
+District_West<- unique(UP_dB$District[UP_dB$Zone=="West"])
+District_West<- as.data.frame(District_West)
+
+District_Brij<- unique(UP_dB$District[UP_dB$Zone=="Brij"])
+District_Brij<- as.data.frame(District_Brij)
+
+District_Awadh<- unique(UP_dB$District[UP_dB$Zone=="Awadh"])
+District_Awadh<- as.data.frame(District_Awadh)
+
+District_Kashi<- unique(UP_dB$District[UP_dB$Zone=="Kashi"])
+District_Kashi<- as.data.frame(District_Kashi)
+
+District_Kanpur<- unique(UP_dB$District[UP_dB$Zone=="Kanpur Bundelkhand"])
+District_Kanpur<- as.data.frame(District_Kanpur)
+
+District_Gorakhpur<- unique(UP_dB$District[UP_dB$Zone=="Gorakhpur"])
+District_Gorakhpur<- as.data.frame(District_Gorakhpur)
+
+Zone<- unique(UP_dB$Zone)
+Zone<- as.data.frame(Zone)
+
+
+PC<- unique(UP_dB$PC_Name)
+PC<- as.data.frame(PC)
+
+Caste<- colnames(UP_dB)[75:131]
+Caste<- as.data.frame(Caste)
+
+shape <- readOGR("AC_POST.shp")
+for (i in 1:dim(shape)[1]){
+  shape$long[i]<- shape@polygons[[i]]@labpt[2]
+  shape$lat[i]<- shape@polygons[[i]]@labpt[1]
+}
+
+
+
+Result_dB<- function(Geo, Geo_2, Demo, Demo_2){
+  if (as.character(Demo)=="Urbanisation"){
+    Result_dB1<- UP_dB[,c(1:9)]
+  } else if (Demo=="Religion"){
+    Result_dB1<- UP_dB[,c(1:7, 10:12)]
+    
+  } else if (Demo=="Caste_Cat"){
+    Result_dB1<- UP_dB[,c(1:7, 13:15)]
+  } else if (Demo=="Caste"){
+    Result_dB1<- UP_dB[,c(1:7, 75:131)]
+  }
+  
+  for (i in 8:dim(Result_dB1)[2]) {
+    Result_dB1[, i]<- round(100*Result_dB1[, i],2)
+  }
+  if (as.character(Geo)=="Zone"){
+    Result_dB1<- Result_dB1[Result_dB1$Zone==as.character(Geo_2),]
+  } 
+  if(as.character(Geo)=="District"){
+    Result_dB1<- Result_dB1[Result_dB1$District==as.character(Geo_2),]
+  } 
+  if(as.character(Geo)=="PC"){
+    Result_dB1<- Result_dB1[Result_dB1$PC_Name==as.character(Geo_2),]
+  } 
+  return(Result_dB1)
+}
+
+Result_dB41<- function(Geo, Geo_2){
+  dB_Demo<- UP_dB[,c(1:15, 75:131)]
+  
+  for (i in 8:dim(dB_Demo)[2]) {
+    dB_Demo[, i]<- round(100*dB_Demo[, i],2)
+  }
+  if (as.character(Geo)=="Zone"){
+    dB_Demo<- dB_Demo[dB_Demo$Zone==as.character(Geo_2),]
+  } 
+  if(as.character(Geo)=="District"){
+    dB_Demo<- dB_Demo[dB_Demo$District==as.character(Geo_2),]
+  } 
+  if(as.character(Geo)=="PC"){
+    dB_Demo<- dB_Demo[dB_Demo$PC_Name==as.character(Geo_2),]
+  } 
+  
+  dB_Demo[dim(dB_Demo)[1]+1, 1]<- "Overall"
+  dB_Demo[dim(dB_Demo)[1], c(8:72)]<- 0
+  for (i in 8:72) {
+    dB_Demo[dim(dB_Demo)[1], i]<- round(sum(dB_Demo$Total_Electors*dB_Demo[,i], na.rm = TRUE )/sum(dB_Demo$Total_Electors, na.rm = TRUE),2)
+  }
+  
+  Rurban<- matrix(0, nrow = 1, ncol = 2)
+  Rurban<- as.data.frame(Rurban)
+  Rurban<- dB_Demo[dim(dB_Demo)[1], 8:9]
+  Rurban<- t(Rurban)
+  Rurban<- as.data.frame(Rurban)
+  Rurban$V2<- rownames(Rurban)
+  
+  Rel<- matrix(0, nrow = 1, ncol = 3)
+  Rel<- as.data.frame(Rel)
+  Rel<- dB_Demo[dim(dB_Demo)[1], 10:12]
+  Rel<- t(Rel)
+  Rel<- as.data.frame(Rel)
+  Rel$V2<- rownames(Rel)
+  
+  Cast_cat<- matrix(0, nrow = 1, ncol = 3)
+  Cast_cat<- as.data.frame(Cast_cat)
+  Cast_cat<- dB_Demo[dim(dB_Demo)[1], 13:15]
+  Cast_cat<- t(Cast_cat)
+  Cast_cat<- as.data.frame(Cast_cat)
+  Cast_cat$V2<- rownames(Cast_cat)
+  
+  Cast<- matrix(0, nrow = 1, ncol = 10)
+  Cast<- as.data.frame(Cast)
+  X<- dB_Demo[dim(dB_Demo)[1], 16:72]
+  X<- X[order(-X)]
+  Cast<- X[,1:10]
+  Cast<- t(Cast)
+  Cast<- as.data.frame(Cast)
+  Cast$V2<- rownames(Cast)
+  
+  
+  p<- ggplot(Cast, aes(x = V2, y = V1, fill= V2)) + geom_bar(stat = "identity", width = .75,  show.legend = TRUE, position = position_dodge())+ geom_col()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=15))+  scale_fill_brewer(palette="RdBu") + geom_label(aes(label = V1), color = "black", fontface = "bold", size=5, position= position_stack(0.9), vjust="outward") +labs(title = "Caste Distribution") 
+  
+  s1<- ggplot(Rurban, aes(x= "", y=V1, fill=V2)) +
+    geom_bar(stat="identity", width=1, color="white") +
+    coord_polar("y") +
+    theme(legend.position="none") +
+    theme_void() + 
+    scale_fill_brewer(palette="RdBu") +
+    geom_label(aes( label = paste(V2, ": ", V1, "%", sep = "")), color = "black", fontface = "bold", size=5, position= position_stack(0.5), vjust="outward") +labs(title = "Rural-Urban Distribution") 
+  
+  s2<- ggplot(Rel, aes(x= "", y=V1, fill=V2)) +
+    geom_bar(stat="identity", width=1, color="white") +
+    coord_polar("y") +
+    theme(legend.position="none") +
+    theme_void() + 
+    scale_fill_brewer(palette="RdBu") +
+    geom_label(aes( label = paste(V2, ": ", V1, "%", sep = "")), color = "black", fontface = "bold", size=5, position= position_stack(0.5), vjust="outward") +labs(title = "Religion Distribution")
+  
+  s3<- ggplot(Cast_cat , aes(x= "", y=V1, fill=V2)) +
+    geom_bar(stat="identity", width=1, color="white") +
+    coord_polar("y") +
+    theme(legend.position="none") +
+    theme_void() + 
+    scale_fill_brewer(palette="RdBu") +
+    geom_label(aes( label = paste(V2, ": ", V1, "%", sep = "")), color = "black", fontface = "bold", size=5, position= position_stack(0.5), vjust="outward") +labs(title = "Caste Category Distribution") 
+  
+  Plot<- plot_grid(s1, s2, s3, p, labels = "AUTO") 
+  
+  return(Plot)
+}
+
+Result_dB41_AC<- function(input){
+  dB_Demo<- UP_dB[UP_dB$AC_Name== as.character(input),]
+  dB_Demo<- dB_Demo[,c(1:15, 75:131)]
+  
+  for (i in 8:dim(dB_Demo)[2]) {
+    dB_Demo[, i]<- round(100*dB_Demo[, i],2)
+  }
+  
+  
+  Rurban<- matrix(0, nrow = 1, ncol = 2)
+  Rurban<- as.data.frame(Rurban)
+  Rurban<- dB_Demo[dim(dB_Demo)[1], 8:9]
+  Rurban<- t(Rurban)
+  Rurban<- as.data.frame(Rurban)
+  Rurban$V2<- rownames(Rurban)
+  
+  Rel<- matrix(0, nrow = 1, ncol = 3)
+  Rel<- as.data.frame(Rel)
+  Rel<- dB_Demo[dim(dB_Demo)[1], 10:12]
+  Rel<- t(Rel)
+  Rel<- as.data.frame(Rel)
+  Rel$V2<- rownames(Rel)
+    
+  Cast_cat<- matrix(0, nrow = 1, ncol = 3)
+  Cast_cat<- as.data.frame(Cast_cat)
+  Cast_cat<- dB_Demo[dim(dB_Demo)[1], 13:15]
+  Cast_cat<- t(Cast_cat)
+  Cast_cat<- as.data.frame(Cast_cat)
+  Cast_cat$V2<- rownames(Cast_cat)
+  
+  Cast<- matrix(0, nrow = 1, ncol = 10)
+  Cast<- as.data.frame(Cast)
+  X<- dB_Demo[dim(dB_Demo)[1], 16:72]
+  X<- X[order(-X)]
+  Cast<- X[,1:10]
+  Cast<- t(Cast)
+  Cast<- as.data.frame(Cast)
+  Cast$V2<- rownames(Cast)
+  
+  
+  p<- ggplot(Cast, aes(x = V2, y = V1, fill= V2)) + geom_bar(stat = "identity", width = .75,  show.legend = TRUE, position = position_dodge())+ geom_col()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=15))+  scale_fill_brewer(palette="RdBu") + geom_label(aes(label = V1), color = "black", fontface = "bold", size=5, position= position_stack(0.5), vjust="inward") +labs(title = "Caste Distribution") 
+  
+  s1<- ggplot(Rurban, aes(x= "", y=V1, fill=V2)) +
+    geom_bar(stat="identity", width=1, color="white") +
+    coord_polar("y") +
+    theme(legend.position="none") +
+    theme_void() + 
+    scale_fill_brewer(palette="RdBu") +
+    geom_label(aes( label = paste(V2, ": ", V1, "%", sep = "")), color = "black", fontface = "bold", size=5, position= position_stack(0.5), vjust="outward") +labs(title = "Rural-Urban Distribution") 
+  
+  s2<- ggplot(Rel, aes(x= "", y=V1, fill=V2)) +
+    geom_bar(stat="identity", width=1, color="white") +
+    coord_polar("y") +
+    theme(legend.position="none") +
+    theme_void() + 
+    scale_fill_brewer(palette="RdBu") +
+    geom_label(aes( label = paste(V2, ": ", V1, "%", sep = "")), color = "black", fontface = "bold", size=5, position= position_stack(0.5), vjust="outward") +labs(title = "Religion Distribution")
+  
+  s3<- ggplot(Cast_cat , aes(x= "", y=V1, fill=V2)) +
+    geom_bar(stat="identity", width=1, color="white") +
+    coord_polar("y") +
+    theme(legend.position="none") +
+    theme_void() + 
+    scale_fill_brewer(palette="RdBu") +
+    geom_label(aes(label = paste(V2, ": ", V1, "%", sep = "")), color = "black", fontface = "bold", size=5, position= position_stack(0.5), vjust="outward") +labs(title = "Caste Category Distribution") 
+  
+  Plot2<- plot_grid(s1, s2, s3, p, labels = "AUTO") 
+  
+  return(Plot2)
+}
+
+react_dB<- function(Geo, Year){
+  if(Geo=="Zone"){UP_dB28<- UP_dB[UP_dB$Zone== input$Zone1,c(1:7, 27:28, 30:31, 33:40, 42:43, 45:52, 54:55, 57:64, 66:67, 69:74)]}
+  else if(Geo=="State"){UP_dB28<- UP_dB[,c(1:7, 27:28, 30:31, 33:40, 42:43, 45:52, 54:55, 57:64, 66:67, 69:74)]}
+  else if(Geo=="District"){UP_dB28<- UP_dB[UP_dB$District== input$District1, c(1:7, 27:28, 30:31, 33:40, 42:43, 45:52, 54:55, 57:64, 66:67, 69:74)]}
+  else if(Geo=="PC"){UP_dB28<- UP_dB[UP_dB$PC_Name== input$PC1, c(1:7, 27:28, 30:31, 33:40, 42:43, 45:52, 54:55, 57:64, 66:67, 69:74)]}
+  
+  if(Year=="LS2019"){UP_dB28<- UP_dB28[,c(1:17)]}
+  else if(Year=="AE2017"){UP_dB28<- UP_dB28[,c(1:7, 18:27)]}
+  else if(Year=="LS2014"){UP_dB28<- UP_dB28[, c(1:7, 28:37)]}
+  else if(Year=="AE2012"){UP_dB28<- UP_dB28[, c(1:7, 38:47)]}
+  
+  colnames(UP_dB28)<- c("Zone", "District", "PC_Num", "PC_Name", "AC_Num", "AC_Name", "Total_Electors","Winner", "Party", "Runner", "Runner_Party", "Margin", "BJP", "INC", "SP", "BSP", "Other")
+  
+  return(UP_dB28)
+}
+
+react_dB39<- function(Geo, Geo_2){
+  if(Geo=="State"){UP_dB31<- UP_dB[, c(1:7, 28, 33:38, 40, 45:50, 52, 57:62, 64, 69:74)]}
+  else if (Geo=="Zone"){UP_dB31<- UP_dB[UP_dB$Zone== Geo_2, c(1:7, 28, 33:38, 40, 45:50, 52, 57:62, 64, 69:74)]}
+  else if (Geo=="District"){UP_dB31<- UP_dB[UP_dB$District== Geo_2, c(1:7, 28, 33:38, 40, 45:50, 52, 57:62, 64, 69:74)]}
+  else if (Geo=="PC"){UP_dB31<- UP_dB[UP_dB$PC_Name== Geo_2, c(1:7, 28, 33:38, 40, 45:50, 52, 57:62, 64, 69:74)]}
+  
+  
+  colnames(UP_dB31)<- c("Zone", "District", "PC_Num", "PC_Name", "AC_Num", "AC_Name", "Total_Electors", "Party_LS19", "Margin_LS19", "BJP_LS19", "INC_LS19", "SP_LS19", "BSP_LS19", "Others_LS19", "Party_AE17", "Margin_AE17", "BJP_AE17", "INC_AE17", "SP_AE17", "BSP_AE17", "Others_AE17", "Party_LS14", "Margin_LS14", "BJP_LS14", "INC_LS14", "SP_LS14", "BSP_LS14", "Others_LS14", "Party_AE12", "Margin_AE12", "BJP_AE12", "INC_AE12", "SP_AE12", "BSP_AE12", "Others_AE12")
+  
+  return(UP_dB31)
+} 
+
+
+
+```
+
+Demography 
+=========================================
+  
+### Demography Related Data
+  
+Column {.sidebar}
+-----------------------------------------
+  
+### Inputs
+  
+```{r}
+
+selectInput("Geography", label = "Geography",
+            choices = c("State", "Zone", "District", "PC"), selected = "State")
+
+conditionalPanel( condition = "input.Geography=='State'",
+                  selectInput("State", label = "State",
+                              choices = c("Uttar Pradesh"), selected = "Uttar Pradesh"))
+
+conditionalPanel( condition = "input.Geography=='Zone'",
+                  selectInput("Zone", label = "Zone",
+                              choices = Zone$Zone, selected = "West"))
+
+conditionalPanel( condition = "input.Geography=='District'",
+                  selectInput("District", label = "District",
+                              choices = District$District, selected = "Rampur"))
+
+conditionalPanel( condition = "input.Geography=='PC'",
+                  selectInput("PC", label = "Parliamentary Constituency",
+                              choices = PC$PC, selected = "Bijnor"))
+
+selectInput("Demography", label = "Demography",
+            choices = c("Urbanisation", "Religion", "Caste_Cat", "Caste"), selected = "Urbanisation")
+
+conditionalPanel( condition = "input.Demography=='Urbanisation'",
+                  selectInput("Urbanisation", label = "Urbanisation",
+                              choices = c("Urban", "Rural"), selected = "Urban"))
+
+conditionalPanel( condition = "input.Demography=='Religion'",
+                  selectInput("Religion", label = "Religion",
+                              choices = c("Hindu", "Islam", "Other_Rel"), selected = "Hindu"))
+
+conditionalPanel( condition = "input.Demography=='Caste_Cat'",
+                  selectInput("Caste_Cat", label = "Caste Category",
+                              choices = c("Gen_OBC", "SC", "ST"), selected = "Gen_OBC"))
+
+conditionalPanel( condition = "input.Demography=='Caste'",
+                  selectInput("Caste", label = "Caste",
+                              choices = Caste$Caste, selected = "Yadav"))
+
+```
+
+Column {.tabset}
+-----------------------------------------------------------------------
+  
+### Map: Demographic Details
+  
+```{r, fig.width = 10, fig.height = 7}
+
+my_data1<- reactive({
+  
+  if(input$Geography=="State"&& input$Demography=="Urbanisation"){
+    UP_dB1<- UP_dB
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Urbanisation)] ))
+  }
+  else if(input$Geography=="State"&& input$Demography=="Religion"){
+    UP_dB1<- UP_dB
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Religion)] ))
+  }
+  else  if(input$Geography=="State"&& input$Demography=="Caste_Cat"){
+    UP_dB1<- UP_dB
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Caste_Cat)] ))
+  }
+  else if(input$Geography=="State"&& input$Demography=="Caste"){
+    UP_dB1<- UP_dB
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Caste)] ))
+  }
+  else if(input$Geography=="Zone"&& input$Demography=="Urbanisation"){
+    UP_dB1<- UP_dB[UP_dB$Zone== input$Zone,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Urbanisation)] ))
+  }
+  else if(input$Geography=="Zone"&& input$Demography=="Religion"){
+    UP_dB1<- UP_dB[UP_dB$Zone== input$Zone,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Religion)] ))
+  }
+  else  if(input$Geography=="Zone"&& input$Demography=="Caste_Cat"){
+    UP_dB1<- UP_dB[UP_dB$Zone== input$Zone,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Caste_Cat)] ))
+  }
+  else if(input$Geography=="Zone"&& input$Demography=="Caste"){
+    UP_dB1<- UP_dB[UP_dB$Zone== input$Zone,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Caste)] ))
+  }
+  else if(input$Geography=="District"&& input$Demography=="Urbanisation"){
+    UP_dB1<- UP_dB[UP_dB$District== input$District,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Urbanisation)] ))
+  }
+  else if(input$Geography=="District"&& input$Demography=="Religion"){
+    UP_dB1<- UP_dB[UP_dB$District== input$District,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Religion)] ))
+  }
+  else  if(input$Geography=="District"&& input$Demography=="Caste_Cat"){
+    UP_dB1<- UP_dB[UP_dB$District== input$District,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Caste_Cat)] ))
+  }
+  else if(input$Geography=="District"&& input$Demography=="Caste"){
+    UP_dB1<- UP_dB[UP_dB$District== input$District,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Caste)] ))
+  }
+  else if(input$Geography=="PC"&& input$Demography=="Urbanisation"){
+    UP_dB1<- UP_dB[UP_dB$PC_Name== input$PC,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Urbanisation)] ))
+  }
+  else if(input$Geography=="PC"&& input$Demography=="Religion"){
+    UP_dB1<- UP_dB[UP_dB$PC_Name== input$PC,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Religion)] ))
+  }
+  else  if(input$Geography=="PC"&& input$Demography=="Caste_Cat"){
+    UP_dB1<- UP_dB[UP_dB$PC_Name== input$PC,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Caste_Cat)] ))
+  }
+  else if(input$Geography=="PC"&& input$Demography=="Caste"){
+    UP_dB1<- UP_dB[UP_dB$PC_Name== input$PC,]
+    UP_dB1$Result<- as.numeric(unlist(UP_dB1[,colnames(UP_dB1)==as.character(input$Caste)] ))
+  }
+  
+  #shape1<- subset(shape, !duplicated(shape$AC_NO))
+  
+  shape1<- subset(shape, is.element(shape$AC_NO, UP_dB1$AC_Num))
+  
+  for (i in 1:dim(shape1)[1]) {
+    shape1$Result[i]<- UP_dB1$Result[UP_dB1$AC_Num==shape1$AC_NO[i]]
+    shape1$District[i]<- UP_dB1$District[UP_dB1$AC_Num==shape1$AC_NO[i]]
+  }
+  
+  labels<- paste("<p>", shape1$AC_NO, ". ", shape1$AC_NAME, "<p>",
+                 "<p>", "District: ", shape1$District,  "<p>",
+                 "<p>", "Result: ", round(100*shape1$Result,2), "%", "<p>",
+                 sep = "")
+  
+  
+  qpal <- colorBin("Blues", as.numeric(unlist(shape1$Result)), bins = 8)
+  
+  # the extra code building off the existing pal
+  #qpal_colors <- unique(qpal(sort(as.numeric(unlist(shape1$Result))))) # hex codes
+  #qpal_labs <- round(100*quantile(as.numeric(unlist(shape1$Result)), seq(0, 1, .1), na.rm = TRUE),2) # depends on n from pal
+  #qpal_labs <- paste(lag(qpal_labs), qpal_labs, sep = " - ")[-1] # first lag is NA
+  
+  
+  map<- leaflet()%>%addTiles()%>% 
+    addPolygons(data = shape1,
+                weight = 1,
+                smoothFactor = 0.5,
+                color = "white",
+                fillOpacity = 0.9,
+                fillColor = qpal(as.numeric(unlist(shape1$Result))), 
+                label= lapply(labels, HTML),
+                highlightOptions = highlightOptions(color = "black",
+                                                    weight = 5, bringToFront = F, opacity = 1))%>%
+    addLegend(pal = qpal , values = as.numeric(unlist(shape1$Result)), bins = 8, opacity = 1)
+  return(map)
+}) 
+
+renderLeaflet({
+  my_data1()
+})
+
+```
+
+### Demographics Trend Analysis
+```{r, fig.width = 10, fig.height = 5}
+renderPlot({
+  
+  if(input$Geography=="State") {Plot<- Result_dB41(input$Geography, "State")}
+  else if(input$Geography=="Zone") {Plot<- Result_dB41(input$Geography, input$Zone)}
+  else if(input$Geography=="District") {Plot<- Result_dB41(input$Geography, input$District)}
+  else if(input$Geography=="PC") {Plot<- Result_dB41(input$Geography, input$PC)}
+  
+  
+  print(Plot)
+  
+}) 
+```
+
+### Table: Demographic Details
+```{r}
+
+my_data2<- reactive({
+  if(input$Geography=="Zone"&& input$Demography=="Urbanisation"){Result_dB(input$Geography, input$Zone, input$Demography, input$Urbanisation)}
+  else if(input$Geography=="Zone"&& input$Demography=="Religion"){Result_dB(input$Geography, input$Zone, input$Demography, input$Religion)}
+  else  if(input$Geography=="Zone"&& input$Demography=="Caste_Cat"){Result_dB(input$Geography, input$Zone, input$Demography, input$Caste_Cat)}
+  else if(input$Geography=="Zone"&& input$Demography=="Caste"){Result_dB(input$Geography, input$Zone, input$Demography, input$Caste)}
+  
+  
+  else if(input$Geography=="District"&& input$Demography=="Urbanisation"){Result_dB(input$Geography, input$District, input$Demography, input$Urbanisation)}
+  else if(input$Geography=="District"&& input$Demography=="Religion"){Result_dB(input$Geography, input$District, input$Demography, input$Religion)}
+  else if(input$Geography=="District"&& input$Demography=="Caste_Cat"){Result_dB(input$Geography, input$District, input$Demography, input$Caste_Cat)}
+  else if(input$Geography=="District"&& input$Demography=="Caste"){Result_dB(input$Geography, input$District, input$Demography, input$Caste)}
+  
+  else if(input$Geography=="PC"&& input$Demography=="Urbanisation"){Result_dB(input$Geography, input$PC, input$Demography, input$Urbanisation)}
+  else if(input$Geography=="PC"&& input$Demography=="Religion"){Result_dB(input$Geography, input$PC, input$Demography, input$Religion)}
+  else if(input$Geography=="PC"&& input$Demography=="Caste_Cat"){Result_dB(input$Geography, input$PC, input$Demography, input$Caste_Cat)}
+  else if(input$Geography=="PC"&& input$Demography=="Caste"){Result_dB(input$Geography, input$PC, input$Demography, input$Caste)}
+  
+  else if(input$Geography=="State"&& input$Demography=="Urbanisation"){Result_dB(input$Geography, input$State, input$Demography, input$Urbanisation)}
+  else if(input$Geography=="State"&& input$Demography=="Religion"){Result_dB(input$Geography, input$State, input$Demography, input$Religion)}
+  else if(input$Geography=="State"&& input$Demography=="Caste_Cat"){Result_dB(input$Geography, input$State, input$Demography, input$Caste_Cat)}
+  else if(input$Geography=="State"&& input$Demography=="Caste"){Result_dB(input$Geography, input$State, input$Demography, input$Caste)}
+  
+})
+
+renderDataTable({
+  datatable(my_data2(), extensions = 'Buttons', options = list(
+    dom = 'Blfrtip',
+    buttons = c('csv', 'excel', 'pdf', 'print'),
+    lengthMenu = list(c(10,25,50,-1),c(10,25,50,"All")),
+    scrollX = TRUE, scrolly= TRUE
+  ))
+})
+```
+
+
+
+Electoral Trends
+=========================================
+  
+### Past Electoral Trends
+  
+Column {.sidebar}
+-----------------------------------------
+  
+### Inputs
+  
+```{r}
+
+selectInput("Geography1", label = "Geography",
+            choices = c("State", "Zone", "District", "PC"), selected = "State")
+
+conditionalPanel( condition = "input.Geography1=='State'",
+                  selectInput("State1", label = "State",
+                              choices = c("Uttar Pradesh"), selected = "Uttar Pradesh"))
+
+conditionalPanel( condition = "input.Geography1=='Zone'",
+                  selectInput("Zone1", label = "Zone",
+                              choices = Zone$Zone, selected = "West"))
+
+conditionalPanel( condition = "input.Geography1=='District'",
+                  selectInput("District1", label = "District",
+                              choices = District$District, selected = District$District[1]))
+
+conditionalPanel( condition = "input.Geography1=='PC'",
+                  selectInput("PC1", label = "Parliamentary Constituency",
+                              choices = PC$PC, selected = PC$PC[1]))
+
+selectInput("Year", label = "Year",
+            choices = c("LS2019", "AE2017", "LS2014", "AE2012"), selected = "LS2019")
+
+
+```
+
+Column {.tabset}
+-----------------------------------------------------------------------
+  
+  
+  
+### Map: Electoral Details
+  
+```{r, fig.width = 10, fig.height = 7}
+
+my_data11<- reactive({
+  
+  
+  
+  UP_dB3<- react_dB(input$Geography1, input$Year)
+  
+  #shape2<- subset(shape, !duplicated(shape$AC_NO))
+  shape2<- subset(shape, is.element(shape$AC_NO, UP_dB3$AC_Num))
+  UP_dB3<- UP_dB3[order(match(UP_dB3$AC_Num, shape2$AC_NO)), ]
+  
+  for (i in 1:dim(shape2)[1]) {
+    shape2$Party[i]<- UP_dB3$Party[UP_dB3$AC_Num==shape2$AC_NO[i]]
+    shape2$Winner[i]<- UP_dB3$Winner[UP_dB3$AC_Num==shape2$AC_NO[i]]
+    shape2$District[i]<- UP_dB3$District[UP_dB3$AC_Num==shape2$AC_NO[i]]
+  }
+  
+  
+  
+  labels2<- paste("<p>", shape2$AC_NO, ". ", shape2$AC_NAME, "<p>",
+                  "<p>", "District: ", shape2$District,  "<p>",
+                  "<p>", "Winner: ", shape2$Winner,  "<p>",
+                  "<p>", "Winner_Party: ", shape2$Party,  "<p>",
+                  sep = "")
+  
+  factpal<- colorFactor(palette = c("orange", "red", "green", "blue", "yellow"), 
+                        levels = c("BJP", "SP", "RLD", "BSP", "INC"))
+  
+  
+  map2<- leaflet()%>%addTiles() %>% 
+    addPolygons(data = shape2,
+                weight = 1,
+                smoothFactor = 0.5,
+                color = "white",
+                fillOpacity = 0.9,
+                fillColor = factpal(shape2$Party), 
+                label= lapply(labels2, HTML),
+                highlightOptions = highlightOptions(color = "black",
+                                                    weight = 5, bringToFront = F, opacity = 1))%>%
+    addLegend(pal= factpal, 
+              values = shape2$Party,
+              opacity = 0.7,
+              position = "topright",
+              title = "Political Party")
+  
+  return(map2)
+  
+})
+
+
+
+
+renderLeaflet({
+  my_data11()
+})
+
+```
+
+### Electoral Trend Analysis
+```{r, fig.width = 10, fig.height = 5}
+
+my_data12<- reactive({
+  
+  UP_dB21<- react_dB(input$Geography1, input$Year)
+  
+  
+  freq<- c("BJP", "SP", "BSP", "INC", "Others")
+  freq<- as.data.frame(freq)
+  
+  freq$count[1]<- sum(UP_dB21$Party=="BJP", na.rm = TRUE )
+  freq$count[2]<- sum(UP_dB21$Party=="SP", na.rm = TRUE )
+  freq$count[3]<- sum(UP_dB21$Party=="BSP", na.rm = TRUE )
+  freq$count[4]<- sum(UP_dB21$Party=="INC", na.rm = TRUE )
+  
+  freq$count[5]<- dim(UP_dB21)[1]-sum(freq$count[1:4])
+  
+  freq$count<- as.numeric(freq$count)
+  
+  p<- ggplot(freq, aes(x = freq, y = count, fill= freq)) + geom_bar(stat = "identity", width = .75,  show.legend = TRUE, position = position_dodge())+ geom_col()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=15))+ scale_fill_manual(values = c("orange", "blue", "yellow", "grey", "red"))+ geom_label(aes(label = count), color = "black", fontface = "bold", size=8, position= position_stack(0.9), vjust="outward") +labs(title = "Seat Share", size= 14)
+  
+  V_share<- c("BJP", "SP", "BSP", "INC", "Others")
+  V_share<- as.data.frame(V_share)
+  
+  V_share$votes[1]<- round(sum(as.numeric(UP_dB21$Total_Electors)*as.numeric(UP_dB21$BJP)),0)
+  V_share$votes[2]<- round(sum(as.numeric(UP_dB21$Total_Electors)*as.numeric(UP_dB21$SP)),0)
+  V_share$votes[3]<- round(sum(as.numeric(UP_dB21$Total_Electors)*as.numeric(UP_dB21$BSP)),0)
+  V_share$votes[4]<- round(sum(as.numeric(UP_dB21$Total_Electors)*as.numeric(UP_dB21$INC)),0)
+  
+  V_share$votes[5]<- sum(UP_dB21$Total_Electors)-sum(V_share$vote[1:4])
+  
+  V_share$vote_percent<- round(100*V_share$votes/sum(V_share$votes),2)
+  
+  s<- ggplot(V_share, aes(x= "", y=vote_percent, fill=V_share)) +
+    geom_bar(stat="identity", width=1, color="white") +
+    coord_polar("y") +
+    theme_void() + 
+    theme(legend.position="none") +
+    scale_fill_manual(values = c("orange", "blue", "yellow", "grey", "red")) +
+    geom_label(aes( label = paste(V_share, ": ", vote_percent, "%", sep = "")), color = "black",  fontface = "bold", size=8, position= position_stack(0.5), vjust="outward") +labs(title = "Vote Share", size= 14) 
+  
+  map12<- plot_grid(p, s, labels = "AUTO") 
+  
+  return(map12)
+})
+
+
+renderPlot({
+  print(my_data12())
+}) 
+```
+
+
+### Table: Electoral Details
+```{r}
+
+
+renderDataTable({
+  datatable(react_dB(input$Geography1, input$Year), extensions = 'Buttons', options = list(
+    dom = 'Blfrtip',
+    buttons = c('csv', 'excel', 'pdf', 'print'),
+    lengthMenu = list(c(10,25,50,-1),c(10,25,50,"All")),
+    scrollX = TRUE, scrolly= TRUE
+  ))
+})
+```
+
+
+Party Performance Analysis
+=========================================
+  
+### Past Electoral Trends
+  
+Column {.sidebar}
+-----------------------------------------
+  
+### Inputs
+  
+```{r}
+
+selectInput("Geography31", label = "Geography",
+            choices = c("State", "Zone", "District", "PC"), selected = "State")
+
+conditionalPanel( condition = "input.Geography31=='State'",
+                  selectInput("State31", label = "State",
+                              choices = c("Uttar Pradesh"), selected = "Uttar Pradesh"))
+
+conditionalPanel( condition = "input.Geography31=='Zone'",
+                  selectInput("Zone31", label = "Zone",
+                              choices = Zone$Zone, selected = "West"))
+
+conditionalPanel( condition = "input.Geography31=='District'",
+                  selectInput("District31", label = "District",
+                              choices = District$District, selected = District$District[1]))
+
+conditionalPanel( condition = "input.Geography31=='PC'",
+                  selectInput("PC31", label = "Parliamentary Constituency",
+                              choices = PC$PC, selected = PC$PC[1]))
+
+selectInput("Party31", label = "Party",
+            choices = c("BJP", "SP", "BSP", "INC", "Others", "Margin"), selected = "BJP")
+
+
+```
+
+Row
+-------------------------------------
+  
+### Map: Electoral Trends
+  
+```{r}
+my_data35<- reactive({
+  
+  if(input$Geography31=="State"){UP_dB311<- react_dB39(input$Geography31, "State")}
+  else if (input$Geography31=="Zone"){UP_dB311<- react_dB39(input$Geography31, input$Zone31)}
+  else if (input$Geography31=="District"){UP_dB311<- react_dB39(input$Geography31, input$District31)}
+  else if (input$Geography31=="PC"){UP_dB311<- react_dB39(input$Geography31, input$PC31)}
+  
+  
+  
+  Share<- matrix(0, nrow = 20, ncol = 6)
+  Share<- as.data.frame(Share)
+  colnames(Share)<- c("Year", "Election", "Party", "Votes", "Seats", "Color")
+  Share$Year<- c("2019", "2017", "2014", "2012", "2019", "2017", "2014", "2012", "2019", "2017", "2014", "2012", "2019", "2017", "2014", "2012", "2019", "2017", "2014", "2012")
+  Share$Election<- c("LS19", "AE17", "LS14", "AE12", "LS19", "AE17", "LS14", "AE12", "LS19", "AE17", "LS14", "AE12", "LS19", "AE17", "LS14", "AE12", "LS19", "AE17", "LS14", "AE12")
+  Share$Party<- rep(c("BJP", "SP", "BSP", "INC", "Others"), each=4)
+  Share$Color<- rep(c("orange", "red", "blue", "yellow", "grey"), each=4)
+  
+  for (i in 1:20) {
+    Share$Votes[i]<- round(100*sum(UP_dB311$Total_Electors*as.numeric(unlist(UP_dB311[,colnames(UP_dB311)==paste(Share$Party[i],"_", Share$Election[i], sep= "")])), na.rm = TRUE)/ sum(UP_dB311$Total_Electors, na.rm = TRUE), 2)
+  }
+  
+  for (i in 1:16) {
+    Share$Seats[i]<- sum(UP_dB311[, colnames(UP_dB311)==paste("Party","_", Share$Election[i], sep = "")]== Share$Party[i], na.rm = TRUE)
+  }
+  
+  Share$Seats[17]<- dim(UP_dB311)[1]- sum(Share$Seats[Share$Year==Share$Year[1]])
+  Share$Seats[18]<- dim(UP_dB311)[1]- sum(Share$Seats[Share$Year==Share$Year[2]])
+  Share$Seats[19]<- dim(UP_dB311)[1]- sum(Share$Seats[Share$Year==Share$Year[3]])
+  Share$Seats[20]<- dim(UP_dB311)[1]- sum(Share$Seats[Share$Year==Share$Year[4]])
+  
+  #shape2<- subset(shape, !duplicated(shape$AC_NO))
+  
+  seat_Share <- ggplot(Share, aes(x = Year, y= Seats, fill = Party)) + geom_bar(stat="identity", width=.5, position = "dodge")   + geom_label(aes(label = Seats), color = "black", fontface = "bold", size=5, position= position_dodge(0.9), vjust="outward") +labs(title = "Seat Distribution")+ scale_fill_manual(values = c("orange", "blue", "yellow", "grey", "red"))
+  
+  Vote_Share<- ggplot(Share, aes(x=Year, y= Votes, group=Party, color= Party)) + geom_line()+ geom_point() +  labs(title="Vote Share Distribution",x= "Year", y = "Vote_Percentage")+ geom_label(aes(label = Votes), color = "black", fontface = "bold", size=5, position= position_dodge(0.9), vjust="outward")+ theme_classic()+ scale_color_manual(values = c("orange", "blue", "yellow", "grey", "red"))
+  
+  Plot<- plot_grid(seat_Share, Vote_Share, labels = "AUTO") 
+  
+  return(Plot)
+  
+})
+
+renderPlot({
+  my_data35()
+})
+
+```
+
+
+Row
+-------------------------------------
+  
+### Map: Electoral Details LS2019
+  
+```{r}
+my_data31<- reactive({
+  
+  if(input$Geography31=="State"){UP_dB311<- react_dB39(input$Geography31, "State")}
+  else if (input$Geography31=="Zone"){UP_dB311<- react_dB39(input$Geography31, input$Zone31)}
+  else if (input$Geography31=="District"){UP_dB311<- react_dB39(input$Geography31, input$District31)}
+  else if (input$Geography31=="PC"){UP_dB311<- react_dB39(input$Geography31, input$PC31)}
+  
+  
+  if(input$Party31=="Margin"){
+    UP_dB311<- UP_dB311[, c(1:7,8, 9, 15, 16, 22, 23, 29, 30)]
+    Color<- "Greens"}
+  else if (input$Party31=="BJP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 10, 15, 17, 22, 24, 29, 31)]
+    Color<- "Oranges"}
+  else if (input$Party31=="INC"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 11, 15, 18, 22, 25, 29, 32)]
+    Color<- "YlGn"}
+  else if (input$Party31=="SP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 12, 15, 19, 22, 26, 29, 33)]
+    Color<- "Reds"}    
+  else if (input$Party31=="BSP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 13, 15, 20, 22, 27, 29, 34)]
+    Color<- "Blues"}    
+  else if (input$Party31=="Others"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 14, 15, 21, 22, 28, 29, 35)]
+    Color<- "Greys"} 
+  
+  colnames(UP_dB311)<- c("Zone", "District", "PC_Num", "PC_Name", "AC_Num", "AC_Name", "Total_Electors", "Party_LS19", "LS2019", "Party_AE17", "AE2017", "Party_LS14", "LS2014", "Party_AE12", "AE2012")
+  
+  #shape2<- subset(shape, !duplicated(shape$AC_NO))
+  shape31<- subset(shape, is.element(shape$AC_NO, UP_dB311$AC_Num))
+  UP_dB311<- UP_dB311[order(match(UP_dB311$AC_Num, shape31$AC_NO)), ]
+  
+  
+  for (i in 1:dim(shape31)[1]) {
+    shape31$LS2019[i]<- round(100*UP_dB311$LS2019[UP_dB311$AC_Num==shape31$AC_NO[i]],2)
+    shape31$Party_LS19[i]<- UP_dB311$Party_LS19[UP_dB311$AC_Num==shape31$AC_NO[i]]
+    shape31$District[i]<- UP_dB311$District[UP_dB311$AC_Num==shape31$AC_NO[i]]
+  }
+  
+  
+  
+  labels19<- paste("<p>", shape31$AC_NO, ". ", shape31$AC_NAME, "<p>",
+                   "<p>", "District: ", shape31$District,  "<p>",
+                   "<p>", "Party Vote Share: ", shape31$LS2019, "%",  "<p>",
+                   "<p>", "Winner Party: ", shape31$Party_LS19,  "<p>",
+                   sep = "")
+  
+  qpal19 <- colorBin(Color, as.numeric(unlist(shape31$LS2019)), bins = 8)
+  
+  
+  
+  map_LS19<- leaflet()%>%addTiles() %>% 
+    addPolygons(data = shape31,
+                weight = 1,
+                smoothFactor = 0.5,
+                color = "white",
+                fillOpacity = 0.9,
+                fillColor = qpal19(as.numeric(unlist(shape31$LS2019))), 
+                label= lapply(labels19, HTML),
+                highlightOptions = highlightOptions(color = "black",
+                                                    weight = 5, bringToFront = F, opacity = 1))%>%
+    addLegend(pal = qpal19 , values = as.numeric(unlist(shape31$LS2019)),  opacity = 1)
+  
+  
+  return(map_LS19)
+  
+})
+
+renderLeaflet({
+  my_data31()
+})
+
+```
+
+
+
+### Map: Electoral Details LS2014
+
+```{r}
+my_data32<- reactive({
+  
+  if(input$Geography31=="State"){UP_dB311<- react_dB39(input$Geography31, "State")}
+  else if (input$Geography31=="Zone"){UP_dB311<- react_dB39(input$Geography31, input$Zone31)}
+  else if (input$Geography31=="District"){UP_dB311<- react_dB39(input$Geography31, input$District31)}
+  else if (input$Geography31=="PC"){UP_dB311<- react_dB39(input$Geography31, input$PC31)}
+  
+  
+  if(input$Party31=="Margin"){
+    UP_dB311<- UP_dB311[, c(1:7,8, 9, 15, 16, 22, 23, 29, 30)]
+    Color<- "Greens"}
+  else if (input$Party31=="BJP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 10, 15, 17, 22, 24, 29, 31)]
+    Color<- "Oranges"}
+  else if (input$Party31=="INC"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 11, 15, 18, 22, 25, 29, 32)]
+    Color<- "YlGn"}
+  else if (input$Party31=="SP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 12, 15, 19, 22, 26, 29, 33)]
+    Color<- "Reds"}    
+  else if (input$Party31=="BSP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 13, 15, 20, 22, 27, 29, 34)]
+    Color<- "Blues"}    
+  else if (input$Party31=="Others"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 14, 15, 21, 22, 28, 29, 35)]
+    Color<- "Greys"} 
+  
+  colnames(UP_dB311)<- c("Zone", "District", "PC_Num", "PC_Name", "AC_Num", "AC_Name", "Total_Electors", "Party_LS19", "LS2019", "Party_AE17", "AE2017", "Party_LS14", "LS2014", "Party_AE12", "AE2012")
+  
+  #shape2<- subset(shape, !duplicated(shape$AC_NO))
+  shape31<- subset(shape, is.element(shape$AC_NO, UP_dB311$AC_Num))
+  UP_dB311<- UP_dB311[order(match(UP_dB311$AC_Num, shape31$AC_NO)), ]
+  
+  
+  for (i in 1:dim(shape31)[1]) {
+    shape31$LS2014[i]<- round(100*UP_dB311$LS2014[UP_dB311$AC_Num==shape31$AC_NO[i]],2)
+    shape31$Party_LS14[i]<- UP_dB311$Party_LS14[UP_dB311$AC_Num==shape31$AC_NO[i]]
+    shape31$District[i]<- UP_dB311$District[UP_dB311$AC_Num==shape31$AC_NO[i]]
+    
+  }
+  
+  
+  labels14<- paste("<p>", shape31$AC_NO, ". ", shape31$AC_NAME, "<p>",
+                   "<p>", "District: ", shape31$District,  "<p>", 
+                   "<p>", "Party Vote Share: ", shape31$LS2014, "%",  "<p>",
+                   "<p>", "Winner Party: ", shape31$Party_LS14,  "<p>",
+                   sep = "")
+  
+  qpal14 <- colorBin(Color, as.numeric(unlist(shape31$LS2014)), bins = 8)
+  
+  map_LS14<- leaflet()%>%addTiles() %>% 
+    addPolygons(data = shape31,
+                weight = 1,
+                smoothFactor = 0.5,
+                color = "white",
+                fillOpacity = 0.9,
+                fillColor = qpal14(as.numeric(unlist(shape31$LS2014))), 
+                label= lapply(labels14, HTML),
+                highlightOptions = highlightOptions(color = "black",
+                                                    weight = 5, bringToFront = F, opacity = 1))%>%
+    addLegend(pal = qpal14 , values = as.numeric(unlist(shape31$LS2014)),  opacity = 1)
+  
+  
+  
+  return(map_LS14)
+  
+})
+
+renderLeaflet({
+  my_data32()
+})
+```
+
+Row
+-------------------------------------
+  
+### Map: Electoral Details AE2017
+  
+```{r}
+my_data33<- reactive({
+  
+  if(input$Geography31=="State"){UP_dB311<- react_dB39(input$Geography31, "State")}
+  else if (input$Geography31=="Zone"){UP_dB311<- react_dB39(input$Geography31, input$Zone31)}
+  else if (input$Geography31=="District"){UP_dB311<- react_dB39(input$Geography31, input$District31)}
+  else if (input$Geography31=="PC"){UP_dB311<- react_dB39(input$Geography31, input$PC31)}
+  
+  
+  if(input$Party31=="Margin"){
+    UP_dB311<- UP_dB311[, c(1:7,8, 9, 15, 16, 22, 23, 29, 30)]
+    Color<- "Greens"}
+  else if (input$Party31=="BJP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 10, 15, 17, 22, 24, 29, 31)]
+    Color<- "Oranges"}
+  else if (input$Party31=="INC"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 11, 15, 18, 22, 25, 29, 32)]
+    Color<- "YlGn"}
+  else if (input$Party31=="SP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 12, 15, 19, 22, 26, 29, 33)]
+    Color<- "Reds"}    
+  else if (input$Party31=="BSP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 13, 15, 20, 22, 27, 29, 34)]
+    Color<- "Blues"}    
+  else if (input$Party31=="Others"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 14, 15, 21, 22, 28, 29, 35)]
+    Color<- "Greys"} 
+  
+  colnames(UP_dB311)<- c("Zone", "District", "PC_Num", "PC_Name", "AC_Num", "AC_Name", "Total_Electors", "Party_LS19", "LS2019", "Party_AE17", "AE2017", "Party_LS14", "LS2014", "Party_AE12", "AE2012")
+  
+  
+  #shape2<- subset(shape, !duplicated(shape$AC_NO))
+  shape31<- subset(shape, is.element(shape$AC_NO, UP_dB311$AC_Num))
+  UP_dB311<- UP_dB311[order(match(UP_dB311$AC_Num, shape31$AC_NO)), ]
+  
+  
+  for (i in 1:dim(shape31)[1]) {
+    shape31$AE2017[i]<- round(100*UP_dB311$AE2017[UP_dB311$AC_Num==shape31$AC_NO[i]],2)
+    shape31$Party_AE17[i]<- UP_dB311$Party_AE17[UP_dB311$AC_Num==shape31$AC_NO[i]]
+    shape31$District[i]<- UP_dB311$District[UP_dB311$AC_Num==shape31$AC_NO[i]]
+    
+  }
+  
+  
+  labels17<- paste("<p>", shape31$AC_NO, ". ", shape31$AC_NAME, "<p>",
+                   "<p>", "District: ", shape31$District,  "<p>",
+                   "<p>", "Party Vote Share: ", shape31$AE2017, "%",  "<p>",
+                   "<p>", "Winner Party: ", shape31$Party_AE17,  "<p>",
+                   sep = "")
+  
+  qpal17 <- colorBin(Color, as.numeric(unlist(shape31$AE2017)), bins = 8)
+  
+  
+  
+  map_AE17<- leaflet()%>%addTiles()%>% 
+    addPolygons(data = shape31,
+                weight = 1,
+                smoothFactor = 0.5,
+                color = "white",
+                fillOpacity = 0.8,
+                fillColor = qpal17(as.numeric(unlist(shape31$AE2017))), 
+                label= lapply(labels17, HTML),
+                highlightOptions = highlightOptions(color = "black",
+                                                    weight = 5, bringToFront = F, opacity = 1))%>%
+    addLegend(pal = qpal17 , values = as.numeric(unlist(shape31$AE2017)),  opacity = 1)
+  
+  
+  return(map_AE17)
+  
+})
+
+renderLeaflet({
+  my_data33()
+})
+
+```
+
+
+
+### Map: Electoral Details AE2012
+
+```{r}
+my_data34<- reactive({
+  
+  if(input$Geography31=="State"){UP_dB311<- react_dB39(input$Geography31, "State")}
+  else if (input$Geography31=="Zone"){UP_dB311<- react_dB39(input$Geography31, input$Zone31)}
+  else if (input$Geography31=="District"){UP_dB311<- react_dB39(input$Geography31, input$District31)}
+  else if (input$Geography31=="PC"){UP_dB311<- react_dB39(input$Geography31, input$PC31)}
+  
+  
+  if(input$Party31=="Margin"){
+    UP_dB311<- UP_dB311[, c(1:7,8, 9, 15, 16, 22, 23, 29, 30)]
+    Color<- "Greens"}
+  else if (input$Party31=="BJP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 10, 15, 17, 22, 24, 29, 31)]
+    Color<- "Oranges"}
+  else if (input$Party31=="INC"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 11, 15, 18, 22, 25, 29, 32)]
+    Color<- "YlGn"}
+  else if (input$Party31=="SP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 12, 15, 19, 22, 26, 29, 33)]
+    Color<- "Reds"}    
+  else if (input$Party31=="BSP"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 13, 15, 20, 22, 27, 29, 34)]
+    Color<- "Blues"}    
+  else if (input$Party31=="Others"){
+    UP_dB311<- UP_dB311[, c(1:7, 8, 14, 15, 21, 22, 28, 29, 35)]
+    Color<- "Greys"} 
+  
+  colnames(UP_dB311)<- c("Zone", "District", "PC_Num", "PC_Name", "AC_Num", "AC_Name", "Total_Electors", "Party_LS19", "LS2019", "Party_AE17", "AE2017", "Party_LS14", "LS2014", "Party_AE12", "AE2012")
+  
+  #shape2<- subset(shape, !duplicated(shape$AC_NO))
+  shape31<- subset(shape, is.element(shape$AC_NO, UP_dB311$AC_Num))
+  UP_dB311<- UP_dB311[order(match(UP_dB311$AC_Num, shape31$AC_NO)), ]
+  
+  
+  for (i in 1:dim(shape31)[1]) {
+    shape31$AE2012[i]<- round(100*UP_dB311$AE2012[UP_dB311$AC_Num==shape31$AC_NO[i]],2)
+    shape31$Party_AE12[i]<- UP_dB311$Party_AE12[UP_dB311$AC_Num==shape31$AC_NO[i]]
+    shape31$District[i]<- UP_dB311$District[UP_dB311$AC_Num==shape31$AC_NO[i]]
+    
+  }
+  
+  
+  labels12<- paste("<p>", shape31$AC_NO, ". ", shape31$AC_NAME, "<p>",
+                   "<p>", "District: ", shape31$District,  "<p>",
+                   "<p>", "Party Vote Share: ", shape31$AE2012, "%",  "<p>",
+                   "<p>", "Winner Party: ", shape31$Party_AE12,  "<p>",
+                   sep = "")
+  
+  qpal12 <- colorBin(Color, as.numeric(unlist(shape31$AE2012)), bins = 8)
+  
+  
+  map_AE12<- leaflet()%>%addTiles()%>% 
+    addPolygons(data = shape31,
+                weight = 1,
+                smoothFactor = 0.5,
+                color = "white",
+                fillOpacity = 0.8,
+                fillColor = qpal12(as.numeric(unlist(shape31$AE2012))), 
+                label= lapply(labels12, HTML),
+                highlightOptions = highlightOptions(color = "black",
+                                                    weight = 5, bringToFront = F, opacity = 1))%>%
+    addLegend(pal = qpal12 , values = as.numeric(unlist(shape31$AE2012)), opacity = 1)
+  
+  
+  return(map_AE12)
+  
+})
+
+renderLeaflet({
+  my_data34()
+})
+```
+
+
+
+Zonal Snapshot
+=========================================
+  
+### Inputs
+  
+```{r}
+
+selectInput("Zone51", label = "Zone", choices = Zone$Zone, selected = "West")
+
+```  
+
+
+District Snapshot
+=========================================
+  
+### Inputs
+  
+```{r}
+
+selectInput("Zone61", label = "Zone",
+            choices = Zone$Zone, selected = "West")
+
+conditionalPanel( condition = "input.Zone61=='West'",
+                  selectInput("District61", label = "District",
+                              choices = District_West[,1], selected = District_West[1,1]))
+conditionalPanel( condition = "input.Zone61=='Brij'",
+                  selectInput("District61", label = "District",
+                              choices = District_Brij[,1], selected = District_Brij[1,1]))
+conditionalPanel( condition = "input.Zone61=='Kashi'",
+                  selectInput("District61", label = "District",
+                              choices = District_Kashi[,1], selected = District_Kashi[1,1]))
+conditionalPanel( condition = "input.Zone61=='Awadh'",
+                  selectInput("District61", label = "District",
+                              choices = District_Awadh[,1], selected = District_Awadh[1,1]))
+conditionalPanel( condition = "input.Zone61=='Kanpur Bundelkhand'",
+                  selectInput("District61", label = "District",
+                              choices = District_Kanpur[,1], selected = District_Kanpur[1,1]))
+conditionalPanel( condition = "input.Zone61=='Gorakhpur'",
+                  selectInput("District61", label = "District",
+                              choices = District_Gorakhpur[,1], selected = District_Gorakhpur[1,1]))
+
+```    
+
+
+
+
+AC Snapshot
+=========================================
+  
+Column {.sidebar}
+-----------------------------------------
+  
+### Inputs
+```{r}
+selectInput("Zone71", label = "Zone",
+            choices = Zone$Zone, selected = "West")
+
+
+conditionalPanel(condition = "input.Zone71=='West'", 
+                 selectInput("AC611", label ="Assembly", 
+                             choices = UP_dB$AC_Name[UP_dB$Zone=="West"], selected = UP_dB$AC_Name[UP_dB$Zone=="West"][1]))
+
+conditionalPanel(condition = "input.Zone71=='Brij'", 
+                 selectInput("AC612", label ="Assembly", choices =UP_dB$AC_Name[UP_dB$Zone=="Brij"], selected = UP_dB$AC_Name[UP_dB$Zone=="Brij"][1]))
+
+conditionalPanel(condition = "input.Zone71=='Awadh'", 
+                 selectInput("AC613", label ="Assembly", choices = UP_dB$AC_Name[UP_dB$Zone=="Awadh"], selected = UP_dB$AC_Name[UP_dB$Zone=="Awadh"][1]))
+
+conditionalPanel(condition = "input.Zone71=='Kashi'", 
+                 selectInput("AC614", label ="Assembly", choices = UP_dB$AC_Name[UP_dB$Zone=="Kashi"], selected = UP_dB$AC_Name[UP_dB$Zone=="Kashi"][1]))
+
+conditionalPanel(condition = "input.Zone71=='Kanpur Bundelkhand'", 
+                 selectInput("AC615", label ="Assembly", choices = UP_dB$AC_Name[UP_dB$Zone=="Kanpur Bundelkhand"], selected = UP_dB$AC_Name[UP_dB$Zone=="Kanpur Bundelkhand"][1]))
+
+conditionalPanel( condition = "input.Zone71=='Gorakhpur'", 
+                  selectInput("AC616", label ="Assembly", choices = UP_dB$AC_Name[UP_dB$Zone=="Gorakhpur"], selected = UP_dB$AC_Name[UP_dB$Zone=="Gorakhpur"][1]))
+
+selectInput("Vill_Para611", label = "Village Parameter",
+            choices = c("Population" ,"SC", "ST", "Literacy", "Manual_Worker", "Cultivator", "Agri_Labour"), selected = "SC")
+
+
+```
+
+Row
+-------------------------------------
+### AC Detail
+#### Assembly Information
+```{r}
+AC_Name31<- reactive({
+  if(input$Zone71== "West"){input$AC611}
+  else if(input$Zone71== "Brij"){input$AC612}
+  else if(input$Zone71== "Awadh"){input$AC613}
+  else if(input$Zone71== "Kashi"){input$AC614}
+  else if(input$Zone71== "Kanpur Bundelkhand"){input$AC615}
+  else if(input$Zone71== "Gorakhpur"){input$AC616}
+})
+
+Data1<- reactive({paste(UP_dB$AC_Num[UP_dB$AC_Name==AC_Name31()], ". ", AC_Name31(), sep = "")})
+Data2<- reactive({paste("Zone: ", UP_dB$Zone[UP_dB$AC_Name==AC_Name31()],   sep = "")})
+Data3<- reactive({paste("District: ",   UP_dB$District[UP_dB$AC_Name==AC_Name31()], sep = "")})
+Data4<- reactive({paste("Total Electors: ", UP_dB$Total_Electors[UP_dB$AC_Name==AC_Name31()], sep = "")})
+Data5<- reactive({paste("Winner Party: ", UP_dB$Party_AE17[UP_dB$AC_Name==AC_Name31()], sep = "")})
+Data6<- reactive({paste("Runner Up: ", UP_dB$Runner_Party_AE17[UP_dB$AC_Name==AC_Name31()], sep = "")})
+
+
+renderText({Data1()})
+
+renderText({Data2()})
+
+renderText({Data3()})
+
+renderText({Data4()})
+
+renderText({Data5()})
+
+renderText({Data6()})
+
+```
+
+### MLA
+#### MLA
+```{r picture, echo = F, fig.cap = "Raghav Lakhanpal", out.width = 100, out.height = 100}
+knitr::include_graphics("download.jpg") 
+```
+
+### MLA
+#### MLA Detail
+```{r}
+AC_Name31<- reactive({
+  if(input$Zone71== "West"){input$AC611}
+  else if(input$Zone71== "Brij"){input$AC612}
+  else if(input$Zone71== "Awadh"){input$AC613}
+  else if(input$Zone71== "Kashi"){input$AC614}
+  else if(input$Zone71== "Kanpur Bundelkhand"){input$AC615}
+  else if(input$Zone71== "Gorakhpur"){input$AC616}
+})
+
+Data1<- reactive({paste(UP_dB$AC_Num[UP_dB$AC_Name==AC_Name31()], ". ", AC_Name31(), sep = "")})
+Data2<- reactive({paste("Zone: ", UP_dB$Zone[UP_dB$AC_Name==AC_Name31()],   sep = "")})
+Data3<- reactive({paste("District: ",   UP_dB$District[UP_dB$AC_Name==AC_Name31()], sep = "")})
+Data4<- reactive({paste("Total Electors: ", UP_dB$Total_Electors[UP_dB$AC_Name==AC_Name31()], sep = "")})
+Data5<- reactive({paste("Winner Party: ", UP_dB$Party_AE17[UP_dB$AC_Name==AC_Name31()], sep = "")})
+Data6<- reactive({paste("Runner Up: ", UP_dB$Runner_Party_AE17[UP_dB$AC_Name==AC_Name31()], sep = "")})
+
+
+renderText({Data1()})
+
+renderText({Data2()})
+
+renderText({Data3()})
+
+renderText({Data4()})
+
+renderText({Data5()})
+
+renderText({Data6()})
+
+```
+
+
+
+Row
+-------------------------------------
+  
+### Map: AC Data
+  
+```{r}
+AC_Name<- reactive({
+  if(input$Zone71== "West"){input$AC611}
+  else if(input$Zone71== "Brij"){input$AC612}
+  else if(input$Zone71== "Awadh"){input$AC613}
+  else if(input$Zone71== "Kashi"){input$AC614}
+  else if(input$Zone71== "Kanpur Bundelkhand"){input$AC615}
+  else if(input$Zone71== "Gorakhpur"){input$AC616}
+}) 
+
+my_data65<- reactive({
+  
+  UP_dB65<- UP_dB[UP_dB$AC_Name==AC_Name(),]
+  
+  
+  shape62<- subset(shape, is.element(shape$AC_NO, UP_dB$AC_Num[UP_dB$Zone==input$Zone71]))
+  
+  
+  
+  shape62@data$Party[shape62@data$AC_NO==UP_dB65$AC_Num[1]]<- UP_dB65$Party_AE17[1]
+  shape62@data$Winner[shape62@data$AC_NO==UP_dB65$AC_Num[1]]<- UP_dB65$Winner_AE17[1]
+  shape62@data$District[shape62@data$AC_NO==UP_dB65$AC_Num[1]]<- UP_dB65$District[1]
+  
+  
+  labels2<- paste("<p>", shape62$AC_NO, ". ", shape62$AC_NAME, "<p>",
+                  "<p>", "District: ", shape62$District,  "<p>",
+                  "<p>", "Winner: ", shape62$Winner,  "<p>",
+                  "<p>", "Winner_Party: ", shape62$Party,  "<p>",
+                  sep = "")
+  
+  factpal<- colorFactor(palette = c("orange", "red", "green", "blue", "yellow"), 
+                        levels = c("BJP", "SP", "RLD", "BSP", "INC"))
+  
+  
+  map62<- leaflet()%>%addTiles() %>% 
+    addPolygons(data = shape62,
+                weight = 1,
+                smoothFactor = 0.5,
+                color = "white",
+                fillOpacity = 0.8,
+                fillColor = factpal(shape62$Party), 
+                label= lapply(labels2, HTML),
+                highlightOptions = highlightOptions(color = "black",
+                                                    weight = 5, bringToFront = F, opacity = 1))%>%
+    addLegend(pal= factpal, 
+              values = shape62$Party,
+              opacity = 0.7,
+              position = "topright",
+              title = "Political Party")%>%addMarkers(shape62$lat[shape62@data$AC_NO==UP_dB65$AC_Num[1]], shape62$long[shape62@data$AC_NO==UP_dB65$AC_Num[1]],  label = as.character(shape62$AC_NAME[shape62@data$AC_NO==UP_dB65$AC_Num[1]]))%>%
+    addControl(paste("<p>", shape62$AC_NO, ". ", shape62$AC_NAME, "<p>",
+                     "<p>", "District: ", shape62$District,  "<p>",
+                     "<p>", "Current MLA: ", shape62$Winner,  "<p>",
+                     "<p>", "Winner_Party: ", shape62$Party,  "<p>",
+                     sep = ""), position = "topleft", className="map-title")
+  
+  return(map62)
+})
+
+
+renderLeaflet({
+  my_data65()
+})
+
+```
+
+Row
+-------------------------------------
+  
+### Demography Details
+  
+```{r, fig.width = 10, fig.height = 5}
+Plot_AC<- reactive({
+  Sys.sleep(2)
+  if(input$Zone71== "West"){out<- input$AC611}
+  else if(input$Zone71== "Brij"){out<- input$AC612}
+  else if(input$Zone71== "Awadh"){out<- input$AC613}
+  else if(input$Zone71== "Kashi"){out<- input$AC614}
+  else if(input$Zone71== "Kanpur Bundelkhand"){out<- input$AC615}
+  else if(input$Zone71== "Gorakhpur"){out<- input$AC616}
+  
+  
+  Plot<- Result_dB41_AC(out)
+  return(Plot)
+})
+
+renderPlot({
+  print(Plot_AC())
+}) 
+```
+
+
+
+
+
+Row
+-------------------------------------
+  
+### Map: Electoral Trends
+  
+```{r}
+
+AC_Name42<- reactive({
+  Sys.sleep(2)
+  if(input$Zone71== "West"){input$AC611}
+  else if(input$Zone71== "Brij"){input$AC612}
+  else if(input$Zone71== "Awadh"){input$AC613}
+  else if(input$Zone71== "Kashi"){input$AC614}
+  else if(input$Zone71== "Kanpur Bundelkhand"){input$AC615}
+  else if(input$Zone71== "Gorakhpur"){input$AC616}
+  
+}) 
+
+
+my_data39<- reactive({
+  
+  UP_dB42<- UP_dB[UP_dB$AC_Name==AC_Name42(),]
+  
+  Share<- matrix(0, nrow = 20, ncol = 6)
+  Share<- as.data.frame(Share)
+  colnames(Share)<- c("Year", "Election", "Party", "Votes", "Candidate", "Color")
+  Share$Year<- c("2019", "2017", "2014", "2012", "2019", "2017", "2014", "2012", "2019", "2017", "2014", "2012", "2019", "2017", "2014", "2012", "2019", "2017", "2014", "2012")
+  Share$Election<- c("LS19", "AE17", "LS14", "AE12", "LS19", "AE17", "LS14", "AE12", "LS19", "AE17", "LS14", "AE12", "LS19", "AE17", "LS14", "AE12", "LS19", "AE17", "LS14", "AE12")
+  Share$Party<- rep(c("BJP", "SP", "BSP", "INC", "Other"), each=4)
+  Share$Color<- rep(c("orange", "red", "blue", "yellow", "grey"), each=4)
+  
+  for (i in 1:20) {
+    Share$Votes[i]<- round(100*as.numeric(unlist(UP_dB42[1,colnames(UP_dB42)==paste(Share$Party[i],"_", Share$Election[i], sep= "")])), 2)
+  }
+  Share$Candidate<- ""
+  for (i in 1:16) {
+    if (length(UP_dB42[1,colnames(UP_dB42)==paste(Share$Party[i],"_", Share$Election[i], "_can", sep= "")] !=0)){
+      Share$Candidate[i]<- UP_dB42[1,colnames(UP_dB42)==paste(Share$Party[i],"_", Share$Election[i], "_can", sep= "")]
+    }
+  }
+  
+  
+  
+  Vote_Share<- ggplot(Share, aes(x=Year, y= Votes, group= Party, color= Party)) + geom_line()+ geom_point() +  labs(title="Vote Share Distribution",x= "Year", y = "Vote_Percentage")+ geom_label(aes(label = paste(Candidate, "\n", Votes, "%")), color = "black", fontface = "bold", size=5, position= position_dodge(0.9), vjust="outward")+ theme_classic()+ scale_color_manual(values = c("orange", "blue", "yellow", "grey", "red"))
+  
+  
+  
+  return(Vote_Share)
+  
+})
+
+renderPlot({
+  my_data39()
+})
+
+```
+
+
+Social Media Analysis
+=========================================
+  
+### Inputs
+```{r}
+selectInput("Party71", label = "Party",
+            choices = c("BJP", "SP", "BSP", "INC", "Azad Party"), selected = "BJP")
+
+
+```
+
